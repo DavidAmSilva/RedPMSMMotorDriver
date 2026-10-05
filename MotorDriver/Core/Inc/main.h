@@ -60,6 +60,8 @@ void Error_Handler(void);
 #define BTN_Board_Pin GPIO_PIN_13
 #define BTN_Board_GPIO_Port GPIOC
 #define BTN_Board_EXTI_IRQn EXTI15_10_IRQn
+#define Bus_Measure_Pin GPIO_PIN_6
+#define Bus_Measure_GPIO_Port GPIOA
 #define LED_Board_Pin GPIO_PIN_6
 #define LED_Board_GPIO_Port GPIOC
 

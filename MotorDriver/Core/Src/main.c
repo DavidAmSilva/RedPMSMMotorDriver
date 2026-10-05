@@ -108,12 +108,14 @@ int main(void)
   MX_USB_Device_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
   uint32_t now = 0, next_blink = 500;
   while (1)
   {
