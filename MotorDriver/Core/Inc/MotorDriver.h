@@ -34,6 +34,7 @@ typedef struct {
 typedef struct {
 	ADC_HandleTypeDef *ADCHandler;
 	uint32_t channel;
+	float currentGain;
 } Current_sensor;
 
 
@@ -62,18 +63,18 @@ typedef struct {
 } Motor;
 
 //Funções para Inversor de frequência
-void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[]);
+void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode);
 void SetInverter_BusVoltage();
 void SetInverter_BusVoltageADC();
 void Inverter_updateBusVoltage();
 void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
 
 
-void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel );
+void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs);
-void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,float ElectricalTs, float MechanicalTs);
-void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,float ElectricalTs, float MechanicalTs);
-void SetMotorSixStep(Motor *PMSM, float MechanicalController[], float MechanicalTs, float InterruptTs);
+void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
+void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs);
+void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
 
 
 void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]);

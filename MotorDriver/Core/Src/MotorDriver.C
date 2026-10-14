@@ -9,7 +9,7 @@
 
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode){
 	for (uint8_t i=0;i<3;i++){
-		Inverter->INChannel[i] = TimersABC[i];
+		Inverter->INTimer[i] = TimersABC[i];
 		Inverter->INChannel[i] = ChannelABC[i];
 		Inverter->ENPort[i] = EnablePorts[i];
 		Inverter->ENPin[i] = EnablePins[i];
@@ -21,19 +21,22 @@ void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], 
 void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle){
 	uint32_t CCR = 0;
 	uint32_t ARR = Timer->Instance->ARR;
+	if(dutyCycle<0) dutyCycle = 0;
+
 	if(dutyCycle<1){
 		CCR = ARR*dutyCycle;
-	} else {
-		CCR = 1;
+	} else{
+		CCR = ARR;
 	}
 
 	__HAL_TIM_SET_COMPARE(Timer, Channel, CCR);
 }
 
 
-void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel ){
+void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain ){
 	Sensor->ADCHandler = ADCHandler;
 	Sensor->channel = ADCChannel;
+	Sensor->currentGain = CurrentGain;
 };
 
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs){
@@ -88,7 +91,7 @@ void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]){
 	if(Vc>Vmax) Vmax = Vc;
 
 	float Vmin = Va;
-	if(Vb<> Vmin) Vmin = Vb;
+	if(Vb< Vmin) Vmin = Vb;
 	if(Vc< Vmin) Vmin = Vc;
 
 	float V_offset = -0.5f*(Vmax + Vmin);
@@ -103,7 +106,7 @@ void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]){
 
 }
 
-void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vmax, float angleRad){
+void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angleRad){
 	float Valfa = 0;
 	float Vbeta = 0;
 	float Va=0;
@@ -115,6 +118,9 @@ void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vmax, float angl
 	arm_inv_park_f32(Vd, Vq, &Valfa, &Vbeta, SinCos[0], SinCos[1]);
 	arm_inv_clarke_f32(Valfa, Vbeta, &Va, &Vb);
 	Vc = -1*(Va+Vb);
+	Va=(Va/Vbus)*1.735;
+	Vb=(Vb/Vbus)*1.735;
+	Vc=(Vc/Vbus)*1.735;
 
 	float dutyCycles[3] = {0,0,0};
 	SVPWM(Va,Vb,Vc,dutyCycles);
