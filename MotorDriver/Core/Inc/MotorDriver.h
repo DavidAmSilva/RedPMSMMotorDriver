@@ -21,6 +21,13 @@ typedef struct {
 	uint32_t INChannel[3];
 	GPIO_TypeDef *ENPort[3];
 	uint16_t ENPin[3];
+	uint8_t dutyMode;
+
+	ADC_HandleTypeDef *Busvoltage_ADCHandler;
+	uint32_t BusvoltageADC_channel;
+	uint8_t BusVoltageADC_flag;
+	float Bus_voltage_converter_gain; //Ganho do divisor resistivo (V/V)
+	float Bus_voltage;
 
 } ThreePhaseInverter;
 
@@ -40,6 +47,8 @@ typedef struct {
 	float HysteresysBands[2]; //Banda de histerese de Torque, Banda de histerese de fluxo;
 	volatile uint32_t position; //Posição em inteiros, decidir escala
 	volatile uint8_t sector;
+	volatile float AngularSpeed;
+	uint32_t MechanicalTsRatio;
 
 	// Declaração dos sensores de corrente da placa
 	Current_sensor *PhaseA;
@@ -52,10 +61,22 @@ typedef struct {
 
 } Motor;
 
+//Funções para Inversor de frequência
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[]);
+void SetInverter_BusVoltage();
+void SetInverter_BusVoltageADC();
+void Inverter_updateBusVoltage();
+void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
+
+
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel );
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs);
-void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB);
-void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB);
-void SetMotorSixStep(Motor *PMSM, float MechanicalController[]);
+void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,float ElectricalTs, float MechanicalTs);
+void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,float ElectricalTs, float MechanicalTs);
+void SetMotorSixStep(Motor *PMSM, float MechanicalController[], float MechanicalTs, float InterruptTs);
+
+
+void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]);
+void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float angle);
+
 #endif /* INC_MOTORDRIVER_H_ */
