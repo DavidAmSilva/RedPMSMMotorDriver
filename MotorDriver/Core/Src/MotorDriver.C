@@ -7,6 +7,8 @@
 
 #include <MotorDriver.h>
 
+#define CALIBRATION_SAMPLES 1024
+
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode){
 	for (uint8_t i=0;i<3;i++){
 		Inverter->INTimer[i] = TimersABC[i];
@@ -37,7 +39,7 @@ void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, ui
 	Sensor->ADCHandler = ADCHandler;
 	Sensor->channel = ADCChannel;
 	Sensor->currentGain = CurrentGain;
-};
+}
 
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs){
 	PMSM->L = L;
@@ -47,7 +49,7 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Im
 	PMSM->PP=PolePairs;
 	PMSM->ControllerFlag = 0;
 	PMSM->AngularSpeed = 0;
-};
+}
 
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
 	for(uint8_t i=0;i<2;i++){
@@ -60,7 +62,7 @@ void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalContr
 	PMSM->iq=0;
 	PMSM->ControllerFlag = 2;
 	PMSM->MechanicalTsRatio = MechanicalTs/ElectricalTs;
-};
+}
 
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs){
 	for(uint8_t i=0;i<2;i++){
@@ -73,7 +75,7 @@ void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalCo
 	PMSM->ibeta=0;
 	PMSM->ControllerFlag = 3;
 	PMSM->MechanicalTsRatio = MechanicalTs/ElectricalTs;
-};
+}
 
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs, uint32_t InterruptTs){
 	for (uint8_t i=0;i<2;i++){
@@ -131,4 +133,42 @@ void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angl
 }
 
 
+static uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel) {
+    ADC_ChannelConfTypeDef sConfig = {0};
+
+    // Configuração do canal desejado para amostragem regular
+    sConfig.Channel      = channel;
+    sConfig.Rank         = ADC_REGULAR_RANK_1;      // Primeiro lugar na sequência regular
+    sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5; // Tempo de amostragem adequado para estabilidade AVALIAR TEMPO DE AMOSTRAGEM PARA SISTEMA
+    sConfig.SingleDiff   = ADC_SINGLE_ENDED;         // Modo de entrada simples (Single-ended)
+    sConfig.OffsetNumber = ADC_OFFSET_NONE;
+
+    if (HAL_ADC_ConfigChannel(hadc, &sConfig) != HAL_OK) {
+        return 0; // Falha na configuração do canal
+    }
+
+    // Dispara a conversão no canal recém-configurado
+    HAL_ADC_Start(hadc);
+    if (HAL_ADC_PollForConversion(hadc, 10) == HAL_OK) {
+        uint32_t val = HAL_ADC_GetValue(hadc);
+        HAL_ADC_Stop(hadc);
+        return val;
+    }
+
+    HAL_ADC_Stop(hadc);
+    return 0;
+}
+
+void CalibrateCurrentOffset(Motor *PMSM){
+	uint32_t offset = 0;
+	//Desativando todas as saídas que possam gerar corrente
+	for (uint8_t i =0;i<3;i++){
+		SetPWM(PMSM->Inverter->INTimer[i], PMSM->Inverter->INChannel[i], 0); //Desativando PWM
+		HAL_GPIO_WritePin(PMSM->Inverter->ENPort[i], PMSM->Inverter->ENPin[i], GPIO_PIN_RESET); //Desativando Enables
+	}
+	HAL_Delay(10);
+
+	//Implementar multiplas leituras com divisão para melhorar frequencia
+
+}
 

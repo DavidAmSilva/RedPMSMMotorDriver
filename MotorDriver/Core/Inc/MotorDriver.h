@@ -35,6 +35,7 @@ typedef struct {
 	ADC_HandleTypeDef *ADCHandler;
 	uint32_t channel;
 	float currentGain;
+	uint32_t Offset;
 } Current_sensor;
 
 
@@ -78,6 +79,13 @@ void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t Mechani
 
 
 void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]);
+
+//Funcoes voltadas para alinhamento do rotor
 void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float angle);
+
+
+//Sensor de corrente
+void CalibrateCurrentOffset(Motor *PMSM);
+void ReadCurrents(Motor *PMSM, float *I_a, float *I_b);
 
 #endif /* INC_MOTORDRIVER_H_ */
