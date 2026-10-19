@@ -35,7 +35,6 @@ Release/
 *.lst
 *.o
 *.d
-*.a
 *.su
 *.crl
 
