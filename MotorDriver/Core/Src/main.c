@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
+#include "MotorDriver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,6 +50,8 @@
 extern int _bflag;
 uint32_t *dfu_boot_flag;
 uint32_t push_count = 0;
+
+Motor MotorRed1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/

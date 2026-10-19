@@ -8,6 +8,7 @@
 #include <MotorDriver.h>
 
 #define CALIBRATION_SAMPLES 1024
+#define PI 3.141593
 
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode){
 	for (uint8_t i=0;i<3;i++){
@@ -87,7 +88,10 @@ void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t Mechani
 
 
 
-void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]){
+void SVPWM(float Va, float Vb, float Vc, float Vbus ,float dutyCycles[]){
+	Va=(Va/Vbus)*1.735;
+	Vb=(Vb/Vbus)*1.735;
+	Vc=(Vc/Vbus)*1.735;
 	float Vmax = Va;
 	if(Vb> Vmax) Vmax = Vb;
 	if(Vc>Vmax) Vmax = Vc;
@@ -120,20 +124,29 @@ void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angl
 	arm_inv_park_f32(Vd, Vq, &Valfa, &Vbeta, SinCos[0], SinCos[1]);
 	arm_inv_clarke_f32(Valfa, Vbeta, &Va, &Vb);
 	Vc = -1*(Va+Vb);
-	Va=(Va/Vbus)*1.735;
-	Vb=(Vb/Vbus)*1.735;
-	Vc=(Vc/Vbus)*1.735;
-
 	float dutyCycles[3] = {0,0,0};
-	SVPWM(Va,Vb,Vc,dutyCycles);
+	SVPWM(Va,Vb,Vc,Vbus,dutyCycles);
 	for(uint8_t i=0;i<3;i++){
+		HAL_GPIO_WritePin(PMSM->Inverter->ENPort[i], PMSM->Inverter->ENPin[i], GPIO_PIN_SET);
 		SetPWM(PMSM->Inverter->INTimer[i], PMSM->Inverter->INChannel[i], dutyCycles[i]);
 	}
 
 }
 
+void AlignMotor (Motor *PMSM, float Valign){
+	for (uint16_t i = 0;i<20;i++){
+		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*2*PI/200);
+		HAL_Delay(100);
+	}
+	for (uint16_t i=20;i>0;i--){
+		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*2*PI/200);
+		HAL_Delay(100);
+	}
+	PMSM->position = 0;
+}
 
-static uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel) {
+
+uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel) {
     ADC_ChannelConfTypeDef sConfig = {0};
 
     // Configuração do canal desejado para amostragem regular
@@ -159,6 +172,8 @@ static uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel) {
     return 0;
 }
 
+
+
 void CalibrateCurrentOffset(Motor *PMSM){
 	uint32_t offset = 0;
 	//Desativando todas as saídas que possam gerar corrente
@@ -168,7 +183,30 @@ void CalibrateCurrentOffset(Motor *PMSM){
 	}
 	HAL_Delay(10);
 
-	//Implementar multiplas leituras com divisão para melhorar frequencia
+	uint32_t Phase_offset[2] = {0,0};
+	for (uint8_t i ;i<2;i++){
+		Phase_offset[i] = 0;
+		for (uint16_t s;s<CALIBRATION_SAMPLES;s++){
+			if(i == 0){
+				Phase_offset[i] += ReadADC_Channel(PMSM->PhaseA->ADCHandler, PMSM->PhaseA->channel);
+			}	else {
+				Phase_offset[i] += ReadADC_Channel(PMSM->PhaseB->ADCHandler, PMSM->PhaseB->channel);
+			}
+
+		}
+		Phase_offset[i] = Phase_offset[i]/CALIBRATION_SAMPLES;
+		if (i ==0){
+			PMSM->PhaseA->Offset = Phase_offset[i];
+		} else {
+			PMSM->PhaseB->Offset = Phase_offset[i];
+		}
+	}
+}
+
+
+void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
+	*I_a = ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel);
+	*I_b = ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel);
 
 }
 

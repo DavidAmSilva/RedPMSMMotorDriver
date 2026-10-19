@@ -47,7 +47,7 @@ typedef struct {
 	float Mechanical_controller[2];
 	float Electrical_controller[2];
 	float HysteresysBands[2]; //Banda de histerese de Torque, Banda de histerese de fluxo;
-	volatile uint32_t position; //Posição em inteiros, decidir escala
+	volatile float position; //Posição radianos
 	volatile uint8_t sector;
 	volatile float AngularSpeed;
 	uint32_t MechanicalTsRatio;
@@ -78,14 +78,19 @@ void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalCo
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
 
 
-void SVPWM(float Va, float Vb, float Vc, float dutyCycles[]);
+void SVPWM(float Va, float Vb, float Vc, float Vbus ,float dutyCycles[]);
 
 //Funcoes voltadas para alinhamento do rotor
-void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float angle);
+void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angleRad);
+void AlignMotor (Motor *PMSM, float Valign);
 
 
 //Sensor de corrente
+uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel);
 void CalibrateCurrentOffset(Motor *PMSM);
-void ReadCurrents(Motor *PMSM, float *I_a, float *I_b);
+void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
+
+//FuncoesControle
+
 
 #endif /* INC_MOTORDRIVER_H_ */
