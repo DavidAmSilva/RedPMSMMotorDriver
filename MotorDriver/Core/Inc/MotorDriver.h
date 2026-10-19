@@ -13,7 +13,10 @@
 #include "stm32g4xx_hal.h"
 #include "arm_math.h"
 
-
+#define CALIBRATION_SAMPLES 1024
+#define PI 3.141593
+#define SQRT3 1.73205f
+#define ALIGNSTEPS 20
 
 typedef struct {
 
