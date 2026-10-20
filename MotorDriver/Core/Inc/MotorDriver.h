@@ -15,6 +15,7 @@
 
 #define CALIBRATION_SAMPLES 1024
 #define PI 3.141593
+#define TWOPI 6.2831853f
 #define SQRT3 1.73205f
 #define ALIGNSTEPS 20
 
@@ -41,6 +42,15 @@ typedef struct {
 	uint32_t Offset;
 } Current_sensor;
 
+typedef struct {
+	TIM_HandleTypeDef *TIMER;
+	uint16_t PPR; //Pulsos por revolução do encoder conectado
+	volatile float MechanicalAngle;
+	volatile float ElectricalAngle;
+	uint32_t CPR; //Contagens por revolução com encoder mode
+	int16_t MechanicalCounter;
+}Encoder;
+
 
 typedef struct {
 	float L, Phy_nom; // Indutância do motor (Considerando apenas indutancia total em alpha), Fluxo nominal do motor e Constante de velocidade do motor
@@ -54,6 +64,9 @@ typedef struct {
 	volatile uint8_t sector;
 	volatile float AngularSpeed;
 	uint32_t MechanicalTsRatio;
+
+	// Declaração do encoder
+	Encoder *encoder;
 
 	// Declaração dos sensores de corrente da placa
 	Current_sensor *PhaseA;
@@ -72,10 +85,10 @@ void SetInverter_BusVoltage();
 void SetInverter_BusVoltageADC();
 void Inverter_updateBusVoltage();
 void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
-
+void setEncoder(Encoder *encoder, TIM_HandleTypeDef Timer,uint16_t PPR );
 
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs);
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder);
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
@@ -87,6 +100,9 @@ void SVPWM(float Va, float Vb, float Vc, float Vbus ,float dutyCycles[]);
 void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angleRad);
 void AlignMotor (Motor *PMSM, float Valign);
 
+//Encoder
+void updateEncoder(Motor *PMSM);
+
 
 //Sensor de corrente
 uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel);
@@ -94,6 +110,6 @@ void CalibrateCurrentOffset(Motor *PMSM);
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
 
 //FuncoesControle
-
+void updateFOC(Motor *PMSM);
 
 #endif /* INC_MOTORDRIVER_H_ */

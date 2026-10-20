@@ -33,6 +33,18 @@ void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle){
 	__HAL_TIM_SET_COMPARE(Timer, Channel, CCR);
 }
 
+void setEncoder(Encoder *encoder, TIM_HandleTypeDef Timer,uint16_t PPR ){
+    encoder->Timer = Timer;
+    encoder->PPR = PPR;
+    encoder->CPR = (uint32_t)PPR * 4; // O Modo Encoder do STM32 (TI12) conta nas bordas de subida e descida de A e B
+    encoder->MechanicalAngle = 0.0f;
+    encoder->MechanicalCounter = 0;
+
+    __HAL_TIM_SET_COUNTER(Timer, 0);
+
+    // Inicializa o periférico de hardware do Timer em Encoder Mode
+    HAL_TIM_Encoder_Start(Timer, TIM_CHANNEL_ALL);
+}
 
 void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain ){
 	Sensor->ADCHandler = ADCHandler;
@@ -40,7 +52,7 @@ void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, ui
 	Sensor->currentGain = CurrentGain;
 }
 
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs){
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder){
 	PMSM->L = L;
 	PMSM->Phy_nom = Phy;
 	PMSM->TelMax = Telmax;
@@ -48,6 +60,7 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Im
 	PMSM->PP=PolePairs;
 	PMSM->ControllerFlag = 0;
 	PMSM->AngularSpeed = 0;
+	PMSM->encoder = encoder;
 }
 
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
@@ -206,5 +219,24 @@ void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
 	*I_a = (ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel) - PMSM->PhaseA->Offset)*PMSM->PhaseA->currentGain;
 	*I_b = (ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel) - PMSM->PhaseB->Offset)*PMSM->PhaseB->currentGain;
 
+}
+
+void updateEncoder(Motor *PMSM){
+	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->TIMER);
+	float rawAngle = PMSM->encoder->MechanicalAngle + cout*CPR/(TWOPI);
+	if (rawAngle > TWOPI){
+		 rawAngle-= TWOPI;
+	} else if (rawAngle<0){
+		rawAngle += TWOPI;
+	}
+	PMSM->encoder->MechanicalAngle = rawAngle;
+	rawAngle = PMSM->encoder->ElectricalAngle + (PMSM->PP)*PMSM->encoder->MechanicalAngle;
+	if (rawAngle > TWOPI){
+		 rawAngle-= TWOPI;
+	} else if (rawAngle<0){
+		rawAngle += TWOPI;
+	}
+	PMSM->encoder->ElectricalAngle = rawAngle;
+	PMSM->encoder->MechanicalCounter += count; //Este valor irá acumulando até a interrupção mecanica ser disparada
 }
 
