@@ -52,27 +52,32 @@ typedef struct {
 
 
 typedef struct {
-	float L, Phy_nom; // Indutância do motor (Considerando apenas indutancia total em alpha), Fluxo nominal do motor e Constante de velocidade do motor
+	float L, Phy_nom; // Indutância do motor (Considerando apenas indutancia total em alphabeta), Fluxo nominal do motor e Constante de velocidade do motor
 	uint8_t PP; //Pares de polos
+	float Kt;
 	float TelMax, Imax; // Parâmetros para limitar torque e corrente do motor
 	volatile float ialfa, ibeta, id, iq; // Corrente em alfa e beta, d e q
-	float Mechanical_controller[2];
-	float Electrical_controller[2];
-	float HysteresysBands[2]; //Banda de histerese de Torque, Banda de histerese de fluxo;
-	volatile float position; //Posição radianos
-	volatile uint8_t sector;
-	volatile float AngularSpeed;
-	uint32_t MechanicalTsRatio;
+
+	//Inversor trifásico associado ao motor
+	ThreePhaseInverter *Inverter;
 
 	// Declaração do encoder
 	Encoder *encoder;
+	volatile uint8_t sector;
+	volatile float AngularSpeed;
 
 	// Declaração dos sensores de corrente da placa
 	Current_sensor *PhaseA;
 	Current_sensor *PhaseB;
 
-	//Inversor trifásico associado ao motor
-	ThreePhaseInverter *Inverter;
+	//Controladores /
+	uint32_t MechTs;
+	uint32_t elecTs;
+	uint32_t MechanicalTsRatio;
+	float Mechanical_controller[2];
+	float Electrical_controller[2];
+	float HysteresysBands[2];
+	volatile uint32_t controller_counter;
 
 	uint8_t ControllerFlag; // 0 = nao config | 1 = SixStep | 2 = FOC | 3 = DTC Classico
 
@@ -87,7 +92,7 @@ void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
 void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR );
 
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder);
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder);
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
@@ -109,7 +114,10 @@ void CalibrateCurrentOffset(Motor *PMSM);
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
 
 //FuncoesControle
-void updateFOC(Motor *PMSM);
+void updateFOCTorqueController(Motor *PMSM, float Telref);
+void updateFOCSpeedController(Motor *PMSM, float ref);
+
+
 
 
 #endif /* INC_MOTORDRIVER_H_ */

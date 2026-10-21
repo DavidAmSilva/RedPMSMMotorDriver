@@ -52,7 +52,7 @@ void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, ui
 	Sensor->currentGain = CurrentGain;
 }
 
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder){
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder){
 	PMSM->L = L;
 	PMSM->Phy_nom = Phy;
 	PMSM->TelMax = Telmax;
@@ -61,6 +61,7 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Im
 	PMSM->ControllerFlag = 0;
 	PMSM->AngularSpeed = 0;
 	PMSM->encoder = encoder;
+	PMSM->Kt = Kt;
 }
 
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
@@ -74,6 +75,8 @@ void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalContr
 	PMSM->iq=0;
 	PMSM->ControllerFlag = 2;
 	PMSM->MechanicalTsRatio = MechanicalTs/ElectricalTs;
+	PMSM->MechTs = MechanicalTs;
+	PMSM->elecTs = ElectricalTs;
 }
 
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs){
@@ -244,3 +247,31 @@ void updateEncoder(Motor *PMSM){
 	PMSM->encoder->MechanicalCounter += count; //Este valor irá acumulando até a interrupção mecanica ser disparada
 }
 
+//Mode == 0 -> Torque control // Mode == 1 -> Speed control
+void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
+	float ia,ib;
+	static float e_errord[2] = {0,0}, e_errorq[2] = {0,0}, m_error[2] = {0,0}; //Declarando erros mecânicos e elétricos
+	updateEncoder(PMSM);
+	ReadMotorCurrents(PMSM, &ia, &ib);
+	arm_clarke_f32(ia, ib, &PMSM->ialfa, &PMSM->ibeta);
+	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &PMSM->id, &PMSM->iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
+	e_errord[1] = e_errord[0];
+	e_errorq[1] = e_errorq[0];
+	if (mode ==0){
+		e_errord[0] = -PMSM->id;
+		e_errorq[0] = ref/PMSM->Kt - PMSM->iq;
+	} else if (mode == 1){
+		if (PMSM->controller_counter>= PMSM->MechanicalTsRatio){
+			PMSM->controller_counter = 0;
+			PMSM->AngularSpeed = 1000000*(PMSM->encoder->MechanicalCounter*TWOPI)/(PMSM->MechTs*PMSM->encoder->CPR);
+			PMSM->encoder->MechanicalCounter = 0;
+			m_error[1] =  m_error[0];
+			m_error[0] = ref - PMSM->AngularSpeed;
+			//Implementar controaldor mecânico
+		}
+	}
+	//Implementar contrlador eletrico + SVPWM
+
+
+	PMSM->controller_counter += 1; // Passar contador para interrupção
+}
