@@ -33,7 +33,7 @@ void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle){
 	__HAL_TIM_SET_COMPARE(Timer, Channel, CCR);
 }
 
-void setEncoder(Encoder *encoder, TIM_HandleTypeDef Timer,uint16_t PPR ){
+void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR ){
     encoder->Timer = Timer;
     encoder->PPR = PPR;
     encoder->CPR = (uint32_t)PPR * 4; // O Modo Encoder do STM32 (TI12) conta nas bordas de subida e descida de A e B
@@ -146,14 +146,16 @@ void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angl
 
 void AlignMotor (Motor *PMSM, float Valign){
 	for (uint16_t i = 0;i<ALIGNSTEPS;i++){
-		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*2*PI/ALIGNSTEPS);
+		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*TWOPI/ALIGNSTEPS);
 		HAL_Delay(100);
 	}
 	for (uint16_t i=ALIGNSTEPS;i>0;i--){
-		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*2*PI/ALIGNSTEPS);
+		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*TWOPI/ALIGNSTEPS);
 		HAL_Delay(100);
 	}
-	PMSM->position = 0;
+	PMSM->encoder->MechanicalAngle = 0;
+	PMSM->encoder->ElectricalAngle =0;
+	__HAL_TIM_SetCounter(PMSM->encoder->Timer,0);
 }
 
 
@@ -216,21 +218,23 @@ void CalibrateCurrentOffset(Motor *PMSM){
 
 
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
-	*I_a = (ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel) - PMSM->PhaseA->Offset)*PMSM->PhaseA->currentGain;
-	*I_b = (ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel) - PMSM->PhaseB->Offset)*PMSM->PhaseB->currentGain;
+	float rawA = (float)ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel);
+	float rawB = (float)ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel);
+	*I_a = (rawA - PMSM->PhaseA->Offset)*PMSM->PhaseA->currentGain;
+	*I_b = (rawB - PMSM->PhaseB->Offset)*PMSM->PhaseB->currentGain;
 
 }
 
 void updateEncoder(Motor *PMSM){
 	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->TIMER);
-	float rawAngle = PMSM->encoder->MechanicalAngle + cout*CPR/(TWOPI);
+	float rawAngle = PMSM->encoder->MechanicalAngle + count*TWOPI/PMSM->encoder->CPR;
 	if (rawAngle > TWOPI){
 		 rawAngle-= TWOPI;
 	} else if (rawAngle<0){
 		rawAngle += TWOPI;
 	}
 	PMSM->encoder->MechanicalAngle = rawAngle;
-	rawAngle = PMSM->encoder->ElectricalAngle + (PMSM->PP)*PMSM->encoder->MechanicalAngle;
+	rawAngle = (PMSM->PP)*PMSM->encoder->MechanicalAngle;
 	if (rawAngle > TWOPI){
 		 rawAngle-= TWOPI;
 	} else if (rawAngle<0){
