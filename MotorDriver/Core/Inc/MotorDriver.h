@@ -14,7 +14,6 @@
 #include "arm_math.h"
 
 #define CALIBRATION_SAMPLES 1024
-#define PI 3.141593
 #define TWOPI 6.2831853f
 #define SQRT3 1.73205f
 #define ALIGNSTEPS 20
@@ -43,7 +42,7 @@ typedef struct {
 } Current_sensor;
 
 typedef struct {
-	TIM_HandleTypeDef *TIMER;
+	TIM_HandleTypeDef *Timer;
 	uint16_t PPR; //Pulsos por revolução do encoder conectado
 	volatile float MechanicalAngle;
 	volatile float ElectricalAngle;
@@ -85,7 +84,7 @@ void SetInverter_BusVoltage();
 void SetInverter_BusVoltageADC();
 void Inverter_updateBusVoltage();
 void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
-void setEncoder(Encoder *encoder, TIM_HandleTypeDef Timer,uint16_t PPR );
+void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR );
 
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder);
@@ -111,5 +110,6 @@ void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
 
 //FuncoesControle
 void updateFOC(Motor *PMSM);
+
 
 #endif /* INC_MOTORDRIVER_H_ */
