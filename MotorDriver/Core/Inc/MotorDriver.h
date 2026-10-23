@@ -18,6 +18,7 @@
 #define SQRT3 1.73205f
 #define ALIGNSTEPS 20
 
+
 typedef struct {
 
 	TIM_HandleTypeDef *INTimer[3];
@@ -55,7 +56,7 @@ typedef struct {
 	float L, Phy_nom; // Indutância do motor (Considerando apenas indutancia total em alphabeta), Fluxo nominal do motor e Constante de velocidade do motor
 	uint8_t PP; //Pares de polos
 	float Kt;
-	float TelMax, Imax; // Parâmetros para limitar torque e corrente do motor
+	float TelMax, Imax, Vmax; // Parâmetros para limitar torque e corrente do motor
 	volatile float ialfa, ibeta, id, iq; // Corrente em alfa e beta, d e q
 
 	//Inversor trifásico associado ao motor
@@ -85,6 +86,7 @@ typedef struct {
 
 //Funções para Inversor de frequência
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode);
+void InverterStartPWM(ThreePhaseInverter *Inverter);
 void SetInverter_BusVoltage();
 void SetInverter_BusVoltageADC();
 void Inverter_updateBusVoltage();
@@ -92,7 +94,7 @@ void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
 void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR );
 
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder);
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, float Vmax, uint8_t PolePairs, Encoder *encoder);
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
@@ -114,8 +116,8 @@ void CalibrateCurrentOffset(Motor *PMSM);
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
 
 //FuncoesControle
-void updateFOCTorqueController(Motor *PMSM, float Telref);
-void updateFOCSpeedController(Motor *PMSM, float ref);
+void updateFOCController(Motor *PMSM, float ref, uint8_t mode);
+
 
 
 

@@ -51,6 +51,10 @@ extern int _bflag;
 uint32_t *dfu_boot_flag;
 uint32_t push_count = 0;
 
+Encoder encM1;
+ThreePhaseInverter inversor;
+Current_sensor PhaseA;
+Current_sensor PhaseB;
 Motor MotorRed1;
 /* USER CODE END PV */
 
@@ -114,7 +118,7 @@ int main(void)
   MX_ADC2_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+  SetInverter(&inversor, (TIM_HandleTypeDef*[]){&htim1,&htim1,&htim1} , (uint32_t[]){TIM_CHANNEL_1,TIM_CHANNEL_2,TIM_CHANNEL_3} , (GPIO_TypeDef*[]){GPIOA,GPIOA,GPIOA}, (uint16_t[]){GPIO_PIN_2,GPIO_PIN_3,GPIO_PIN_4}, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */

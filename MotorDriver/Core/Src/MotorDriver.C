@@ -52,7 +52,7 @@ void SetCurrentSensor (Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, ui
 	Sensor->currentGain = CurrentGain;
 }
 
-void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, uint8_t PolePairs, Encoder *encoder){
+void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, float Vmax, uint8_t PolePairs, Encoder *encoder){
 	PMSM->L = L;
 	PMSM->Phy_nom = Phy;
 	PMSM->TelMax = Telmax;
@@ -62,6 +62,7 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax,
 	PMSM->AngularSpeed = 0;
 	PMSM->encoder = encoder;
 	PMSM->Kt = Kt;
+	PMSM->Vmax = Vmax;
 }
 
 void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
@@ -229,7 +230,7 @@ void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
 }
 
 void updateEncoder(Motor *PMSM){
-	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->TIMER);
+	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->Timer);
 	float rawAngle = PMSM->encoder->MechanicalAngle + count*TWOPI/PMSM->encoder->CPR;
 	if (rawAngle > TWOPI){
 		 rawAngle-= TWOPI;
@@ -249,17 +250,17 @@ void updateEncoder(Motor *PMSM){
 
 //Mode == 0 -> Torque control // Mode == 1 -> Speed control
 void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
-	float ia,ib;
-	static float e_errord[2] = {0,0}, e_errorq[2] = {0,0}, m_error[2] = {0,0}; //Declarando erros mecânicos e elétricos
+	float ia,ib,iqref=0;
+	static float e_errord[2] = {0,0}, e_errorq[2] = {0,0}, m_error[2] = {0,0}, vdref[2] = {0,0}, vqref[2] = {0,0}; //Declarando erros mecânicos e elétricos
+	static float tel_ref[2] = {0,0};
 	updateEncoder(PMSM);
 	ReadMotorCurrents(PMSM, &ia, &ib);
 	arm_clarke_f32(ia, ib, &PMSM->ialfa, &PMSM->ibeta);
 	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &PMSM->id, &PMSM->iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
-	e_errord[1] = e_errord[0];
-	e_errorq[1] = e_errorq[0];
+	//e_errord[1] = e_errord[0];
+	//e_errorq[1] = e_errorq[0];
 	if (mode ==0){
-		e_errord[0] = -PMSM->id;
-		e_errorq[0] = ref/PMSM->Kt - PMSM->iq;
+		iqref = ref/PMSM->Kt;
 	} else if (mode == 1){
 		if (PMSM->controller_counter>= PMSM->MechanicalTsRatio){
 			PMSM->controller_counter = 0;
@@ -268,10 +269,46 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 			m_error[1] =  m_error[0];
 			m_error[0] = ref - PMSM->AngularSpeed;
 			//Implementar controaldor mecânico
+			tel_ref[0] = tel_ref[1] + PMSM->Mechanical_controller[0]*m_error[0] -  PMSM->Mechanical_controller[1]*m_error[1];
+			//Saturando o torque
+			if (tel_ref[0]> PMSM->TelMax){
+				tel_ref[0] = PMSM->TelMax;
+			} else if (tel_ref[0]< -PMSM->TelMax){
+				tel_ref[0] = -PMSM->TelMax;
+			}
+			tel_ref[1] = tel_ref[0];
 		}
-	}
-	//Implementar contrlador eletrico + SVPWM
 
+
+		iqref = tel_ref[0]/PMSM->Kt;
+
+	}
+	e_errord[0] = -PMSM->id;
+	if(iqref > PMSM->Imax){
+		iqref = PMSM->Imax;
+	} else if (iqref < -PMSM->Imax) {
+		iqref = -PMSM->Imax;
+	}
+	e_errorq[0] = iqref - PMSM->iq;
+	//Implementar contrlador eletrico + SVPWM
+	vdref[0] = vdref[1] + PMSM->Electrical_controller[0]*e_errord[0] - PMSM->Electrical_controller[1]*e_errord[1];
+	vqref[0] = vqref[1] + PMSM->Electrical_controller[0]*e_errorq[0] - PMSM->Electrical_controller[1]*e_errorq[1];
+	if (vdref[0] > PMSM->Vmax){
+		vdref[0] = PMSM->Vmax;
+	} else if (vdref[0] < -PMSM->Vmax){
+		vdref[0] = -PMSM->Vmax;
+	}
+	vdref[1] = vdref[0];
+
+	if (vqref[0] > PMSM->Vmax){
+		vqref[0] = PMSM->Vmax;
+	} else if (vqref[0] < -PMSM->Vmax){
+		vqref[0] = -PMSM->Vmax;
+	}
+	vqref[1] = vqref[0];
+
+
+	ApplyVoltageVector(PMSM, vdref[0], vqref[0], PMSM->Inverter->Bus_voltage, PMSM->encoder->ElectricalAngle);
 
 	PMSM->controller_counter += 1; // Passar contador para interrupção
 }
