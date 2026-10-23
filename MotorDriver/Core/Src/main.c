@@ -139,7 +139,7 @@ int main(void)
 	  now = uwTick;
 	  if  (now >= next_blink){
 		 HAL_GPIO_TogglePin(LED_Board_GPIO_Port,LED_Board_Pin);
-		 CDC_Transmit_FS((uint8_t *) "aaa\n", 4);
+		 printf("offset %d\r\n",MotorRed1.PhaseA->Offset);
 		 next_blink = now+1000;
 	  }
     /* USER CODE END WHILE */
@@ -195,7 +195,14 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+int _write(int file, char *ptr, int len)
+{
+    while (CDC_Transmit_FS((uint8_t *)ptr, len) == USBD_BUSY)
+    {
+        HAL_Delay(1);
+    }
+    return len;
+}
 /* USER CODE END 4 */
 
 /**
