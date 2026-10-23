@@ -65,11 +65,12 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax,
 	PMSM->Vmax = Vmax;
 }
 
-void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
+void SetMotorFOC(Motor *PMSM, ThreePhaseInverter* Inverter, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
 	for(uint8_t i=0;i<2;i++){
 		PMSM->Electrical_controller[i] =ElectricalController[i];
 		PMSM->Mechanical_controller[i] =MechanicalController[i];
 	};
+	PMSM->Inverter = Inverter;
 	PMSM->PhaseA = PhaseA;
 	PMSM->PhaseB = PhaseB;
 	PMSM->id=0;

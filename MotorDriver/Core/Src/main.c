@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "arm_math.h"
 #include "MotorDriver.h"
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -125,7 +126,7 @@ int main(void)
   SetCurrentSensor(&PhaseA, &hadc1, ADC_CHANNEL_1, 0.2);
   SetCurrentSensor(&PhaseB, &hadc1, ADC_CHANNEL_2, 0.2);
   SetMotorParameters(&MotorRed1, 0.000787, 0.012, 0.127, 0.1, 0.85, Vbus/SQRT3, 11, &encM1);
-  SetMotorFOC(&MotorRed1, (float[]){0.01, 0.01},(float[]){0.01, 0.01}, &PhaseA, &PhaseB, 100, 100000);
+  SetMotorFOC(&MotorRed1,&inversor, (float[]){0.01, 0.01},(float[]){0.01, 0.01}, &PhaseA, &PhaseB, 100, 100000);
   CalibrateCurrentOffset(&MotorRed1);
   /* USER CODE END 2 */
 
@@ -138,6 +139,7 @@ int main(void)
 	  now = uwTick;
 	  if  (now >= next_blink){
 		 HAL_GPIO_TogglePin(LED_Board_GPIO_Port,LED_Board_Pin);
+		 CDC_Transmit_FS((uint8_t *) "aaa\n", 4);
 		 next_blink = now+1000;
 	  }
     /* USER CODE END WHILE */

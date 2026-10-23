@@ -95,7 +95,7 @@ void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR );
 
 void SetCurrentSensor(Current_sensor *Sensor, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel, float CurrentGain  );
 void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax, float Imax, float Vmax, uint8_t PolePairs, Encoder *encoder);
-void SetMotorFOC(Motor *PMSM, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
+void SetMotorFOC(Motor *PMSM, ThreePhaseInverter* Inverter, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorClassicalDTC(Motor *PMSM, float HyteresysBands[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB,uint32_t ElectricalTs, uint32_t MechanicalTs);
 void SetMotorSixStep(Motor *PMSM, float MechanicalController[], uint32_t MechanicalTs,uint32_t InterruptTs);
 
