@@ -192,7 +192,6 @@ uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel) {
 
 
 void CalibrateCurrentOffset(Motor *PMSM){
-	uint32_t offset = 0;
 	//Desativando todas as saídas que possam gerar corrente
 	for (uint8_t i =0;i<3;i++){
 		SetPWM(PMSM->Inverter->INTimer[i], PMSM->Inverter->INChannel[i], 0); //Desativando PWM
@@ -250,13 +249,17 @@ void updateEncoder(Motor *PMSM){
 
 //Mode == 0 -> Torque control // Mode == 1 -> Speed control
 void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
-	float ia,ib,iqref=0;
+	float ia,ib,ialfa = 0,ibeta = 0,id =0,iq=0,iqref=0;
 	static float e_errord[2] = {0,0}, e_errorq[2] = {0,0}, m_error[2] = {0,0}, vdref[2] = {0,0}, vqref[2] = {0,0}; //Declarando erros mecânicos e elétricos
 	static float tel_ref[2] = {0,0};
 	updateEncoder(PMSM);
 	ReadMotorCurrents(PMSM, &ia, &ib);
-	arm_clarke_f32(ia, ib, &PMSM->ialfa, &PMSM->ibeta);
-	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &PMSM->id, &PMSM->iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
+	arm_clarke_f32(ia, ib,&ialfa ,&ibeta);
+	PMSM->ialfa = ialfa;
+	PMSM->ibeta = ibeta;
+	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &id, &iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
+	PMSM->id = id;
+	PMSM->iq = iq;
 	//e_errord[1] = e_errord[0];
 	//e_errorq[1] = e_errorq[0];
 	if (mode ==0){

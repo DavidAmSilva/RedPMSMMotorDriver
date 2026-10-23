@@ -118,7 +118,15 @@ int main(void)
   MX_ADC2_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  float Vbus = 18;
   SetInverter(&inversor, (TIM_HandleTypeDef*[]){&htim1,&htim1,&htim1} , (uint32_t[]){TIM_CHANNEL_1,TIM_CHANNEL_2,TIM_CHANNEL_3} , (GPIO_TypeDef*[]){GPIOA,GPIOA,GPIOA}, (uint16_t[]){GPIO_PIN_2,GPIO_PIN_3,GPIO_PIN_4}, 1);
+  HAL_TIM_PWM_Init(&htim1);
+  setEncoder(&encM1, &htim2, 4096);
+  SetCurrentSensor(&PhaseA, &hadc1, ADC_CHANNEL_1, 0.2);
+  SetCurrentSensor(&PhaseB, &hadc1, ADC_CHANNEL_2, 0.2);
+  SetMotorParameters(&MotorRed1, 0.000787, 0.012, 0.127, 0.1, 0.85, Vbus/SQRT3, 11, &encM1);
+  SetMotorFOC(&MotorRed1, (float[]){0.01, 0.01},(float[]){0.01, 0.01}, &PhaseA, &PhaseB, 100, 100000);
+  CalibrateCurrentOffset(&MotorRed1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
