@@ -316,3 +316,23 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 
 	PMSM->controller_counter += 1; // Passar contador para interrupção
 }
+
+void SetInverterBusVoltage(ThreePhaseInverter *Inverter, float BusVoltage){
+	Inverter->Bus_voltage = BusVoltage;
+}
+
+void SetInverterBusVoltageADC(ThreePhaseInverter *Inverter, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel){
+	Inverter->Busvoltage_ADCHandler = ADCHandler;
+	Inverter->BusvoltageADC_channel = ADCChannel;
+}
+
+void UpdateBusvoltage(Motor *PMSM){
+	if (PMSM->Inverter->Busvoltage_ADCHandler == NULL){
+		return ;
+	}
+	float bus_voltage = ReadADC_Channel(PMSM->Inverter->Busvoltage_ADCHandler, PMSM->Inverter->BusvoltageADC_channel)*PMSM->Inverter->Bus_voltage_converter_gain;
+	PMSM->Inverter->Bus_voltage = bus_voltage;
+	PMSM->Vmax = bus_voltage/SQRT3;
+}
+
+

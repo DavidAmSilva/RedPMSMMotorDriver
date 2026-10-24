@@ -87,8 +87,8 @@ typedef struct {
 //Funções para Inversor de frequência
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode);
 void InverterStartPWM(ThreePhaseInverter *Inverter);
-void SetInverter_BusVoltage();
-void SetInverter_BusVoltageADC();
+void SetInverterBusVoltage(ThreePhaseInverter *Inverter, float BusVoltage);
+void SetInverterBusVoltageADC(ThreePhaseInverter *Inverter, ADC_HandleTypeDef *ADCHandler, uint32_t ADCChannel);
 void Inverter_updateBusVoltage();
 void SetPWM(TIM_HandleTypeDef *Timer, uint32_t Channel, float dutyCycle);
 void setEncoder(Encoder *encoder, TIM_HandleTypeDef *Timer,uint16_t PPR );
@@ -106,14 +106,15 @@ void SVPWM(float Va, float Vb, float Vc, float Vbus ,float dutyCycles[]);
 void ApplyVoltageVector (Motor *PMSM, float Vd, float Vq, float Vbus, float angleRad);
 void AlignMotor (Motor *PMSM, float Valign);
 
+
+
 //Encoder
 void updateEncoder(Motor *PMSM);
-
-
-//Sensor de corrente
+//Sensores ADC
 uint32_t ReadADC_Channel(ADC_HandleTypeDef *hadc, uint32_t channel);
 void CalibrateCurrentOffset(Motor *PMSM);
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b);
+void UpdateBusvoltage(Motor *PMSM);
 
 //FuncoesControle
 void updateFOCController(Motor *PMSM, float ref, uint8_t mode);
