@@ -117,12 +117,13 @@ int main(void)
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_ADC2_Init();
-  MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   float Vbus = 18;
   SetInverter(&inversor, (TIM_HandleTypeDef*[]){&htim1,&htim1,&htim1} , (uint32_t[]){TIM_CHANNEL_1,TIM_CHANNEL_2,TIM_CHANNEL_3} , (GPIO_TypeDef*[]){GPIOA,GPIOA,GPIOA}, (uint16_t[]){GPIO_PIN_2,GPIO_PIN_3,GPIO_PIN_4}, 1);
   HAL_TIM_PWM_Init(&htim1);
-  setEncoder(&encM1, &htim2, 4096);
+  setEncoder(&encM1, &htim3, 4096);
+ //HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
   SetCurrentSensor(&PhaseA, &hadc1, ADC_CHANNEL_1, 0.2);
   SetCurrentSensor(&PhaseB, &hadc1, ADC_CHANNEL_2, 0.2);
   SetMotorParameters(&MotorRed1, 0.000787, 0.012, 0.127, 0.1, 0.85, Vbus/SQRT3, 11, &encM1);
@@ -133,18 +134,20 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  uint32_t now = 0, next_blink = 500;
+  uint32_t now = 0, next_blink = 250;
   while (1)
   {
 	  now = uwTick;
 	  if  (now >= next_blink){
 		 HAL_GPIO_TogglePin(LED_Board_GPIO_Port,LED_Board_Pin);
-		 printf("offset %d\r\n",MotorRed1.PhaseA->Offset);
-		 next_blink = now+1000;
+		 updateEncoder(&MotorRed1);
+		 printf("position %f\r\n",MotorRed1.encoder->MechanicalAngle);
+		 next_blink = now+50;
 	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
   }
   /* USER CODE END 3 */
 }

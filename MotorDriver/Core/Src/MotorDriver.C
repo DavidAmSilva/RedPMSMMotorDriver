@@ -6,6 +6,7 @@
  */
 
 #include <MotorDriver.h>
+#include <math.h>
 
 
 void SetInverter(ThreePhaseInverter* Inverter,  TIM_HandleTypeDef *TimersABC[], uint32_t ChannelABC[], GPIO_TypeDef *EnablePorts[], uint16_t EnablePins[], uint8_t PWMMode){
@@ -63,6 +64,12 @@ void SetMotorParameters(Motor *PMSM , float L, float Phy, float Kt,float Telmax,
 	PMSM->encoder = encoder;
 	PMSM->Kt = Kt;
 	PMSM->Vmax = Vmax;
+	PMSM->tel_ref_prev = 0;
+	PMSM->m_error_prev = 0;
+	PMSM->e_v_q_prev = 0;
+	PMSM->e_v_d_prev = 0;
+	PMSM->e_error_d_prev = 0;
+	PMSM->e_error_q_prev = 0;
 }
 
 void SetMotorFOC(Motor *PMSM, ThreePhaseInverter* Inverter, float ElectricalController[],float MechanicalController[], Current_sensor *PhaseA, Current_sensor *PhaseB ,uint32_t ElectricalTs, uint32_t MechanicalTs){
@@ -231,6 +238,7 @@ void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
 
 void updateEncoder(Motor *PMSM){
 	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->Timer);
+	__HAL_TIM_SetCounter(PMSM->encoder->Timer,0);
 	float rawAngle = PMSM->encoder->MechanicalAngle + count*TWOPI/PMSM->encoder->CPR;
 	if (rawAngle > TWOPI){
 		 rawAngle-= TWOPI;
@@ -239,6 +247,7 @@ void updateEncoder(Motor *PMSM){
 	}
 	PMSM->encoder->MechanicalAngle = rawAngle;
 	rawAngle = (PMSM->PP)*PMSM->encoder->MechanicalAngle;
+	rawAngle = fmodf(rawAngle,TWOPI);
 	if (rawAngle > TWOPI){
 		 rawAngle-= TWOPI;
 	} else if (rawAngle<0){
@@ -251,8 +260,8 @@ void updateEncoder(Motor *PMSM){
 //Mode == 0 -> Torque control // Mode == 1 -> Speed control
 void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	float ia,ib,ialfa = 0,ibeta = 0,id =0,iq=0,iqref=0;
-	static float e_errord[2] = {0,0}, e_errorq[2] = {0,0}, m_error[2] = {0,0}, vdref[2] = {0,0}, vqref[2] = {0,0}; //Declarando erros mecânicos e elétricos
-	static float tel_ref[2] = {0,0};
+	static float e_errord =0, e_errorq = 0, m_error = 0, vdref=0, vqref=0; //Declarando erros mecânicos e elétricos
+	static float tel_ref=0;
 	updateEncoder(PMSM);
 	ReadMotorCurrents(PMSM, &ia, &ib);
 	arm_clarke_f32(ia, ib,&ialfa ,&ibeta);
@@ -261,58 +270,58 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &id, &iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
 	PMSM->id = id;
 	PMSM->iq = iq;
-	//e_errord[1] = e_errord[0];
-	//e_errorq[1] = e_errorq[0];
+	//PMSM->e_error_d_prev = e_errord;
+	//PMSM->e_error_q_prev = e_errorq;
 	if (mode ==0){
-		iqref = ref/PMSM->Kt;
+		iqref = 0.66666f*(ref/PMSM->Kt); // (2/3)*(Tel/Kt)
 	} else if (mode == 1){
 		if (PMSM->controller_counter>= PMSM->MechanicalTsRatio){
 			PMSM->controller_counter = 0;
 			PMSM->AngularSpeed = 1000000*(PMSM->encoder->MechanicalCounter*TWOPI)/(PMSM->MechTs*PMSM->encoder->CPR);
 			PMSM->encoder->MechanicalCounter = 0;
-			m_error[1] =  m_error[0];
-			m_error[0] = ref - PMSM->AngularSpeed;
+			PMSM->m_error_prev =  m_error;
+			m_error = ref - PMSM->AngularSpeed;
 			//Implementar controaldor mecânico
-			tel_ref[0] = tel_ref[1] + PMSM->Mechanical_controller[0]*m_error[0] -  PMSM->Mechanical_controller[1]*m_error[1];
+			tel_ref = PMSM->tel_ref_prev + PMSM->Mechanical_controller[0]*m_error -  PMSM->Mechanical_controller[1]*PMSM->m_error_prev;
 			//Saturando o torque
-			if (tel_ref[0]> PMSM->TelMax){
-				tel_ref[0] = PMSM->TelMax;
-			} else if (tel_ref[0]< -PMSM->TelMax){
-				tel_ref[0] = -PMSM->TelMax;
+			if (tel_ref> PMSM->TelMax){
+				tel_ref = PMSM->TelMax;
+			} else if (tel_ref< -PMSM->TelMax){
+				tel_ref = -PMSM->TelMax;
 			}
-			tel_ref[1] = tel_ref[0];
+			PMSM->tel_ref_prev = tel_ref;
 		}
 
 
-		iqref = tel_ref[0]/PMSM->Kt;
+		iqref =  0.66666f*tel_ref/PMSM->Kt;
 
 	}
-	e_errord[0] = -PMSM->id;
+	e_errord = -PMSM->id;
 	if(iqref > PMSM->Imax){
 		iqref = PMSM->Imax;
 	} else if (iqref < -PMSM->Imax) {
 		iqref = -PMSM->Imax;
 	}
-	e_errorq[0] = iqref - PMSM->iq;
+	e_errorq = iqref - PMSM->iq;
 	//Implementar contrlador eletrico + SVPWM
-	vdref[0] = vdref[1] + PMSM->Electrical_controller[0]*e_errord[0] - PMSM->Electrical_controller[1]*e_errord[1];
-	vqref[0] = vqref[1] + PMSM->Electrical_controller[0]*e_errorq[0] - PMSM->Electrical_controller[1]*e_errorq[1];
-	if (vdref[0] > PMSM->Vmax){
-		vdref[0] = PMSM->Vmax;
-	} else if (vdref[0] < -PMSM->Vmax){
-		vdref[0] = -PMSM->Vmax;
+	vdref = PMSM->e_v_d_prev + PMSM->Electrical_controller[0]*e_errord - PMSM->Electrical_controller[1]*PMSM->e_error_d_prev;
+	vqref = PMSM->e_v_q_prev + PMSM->Electrical_controller[0]*e_errorq - PMSM->Electrical_controller[1]*PMSM->e_error_q_prev;
+	if (vdref > PMSM->Vmax){
+		vdref = PMSM->Vmax;
+	} else if (vdref < -PMSM->Vmax){
+		vdref = -PMSM->Vmax;
 	}
-	vdref[1] = vdref[0];
+	PMSM->e_v_d_prev = vdref;
 
-	if (vqref[0] > PMSM->Vmax){
-		vqref[0] = PMSM->Vmax;
-	} else if (vqref[0] < -PMSM->Vmax){
-		vqref[0] = -PMSM->Vmax;
+	if (vqref > PMSM->Vmax){
+		vqref = PMSM->Vmax;
+	} else if (vqref < -PMSM->Vmax){
+		vqref = -PMSM->Vmax;
 	}
-	vqref[1] = vqref[0];
+	PMSM->e_v_q_prev = vqref;
 
 
-	ApplyVoltageVector(PMSM, vdref[0], vqref[0], PMSM->Inverter->Bus_voltage, PMSM->encoder->ElectricalAngle);
+	ApplyVoltageVector(PMSM, vdref, vqref, PMSM->Inverter->Bus_voltage, PMSM->encoder->ElectricalAngle);
 
 	PMSM->controller_counter += 1; // Passar contador para interrupção
 }

@@ -71,7 +71,7 @@ typedef struct {
 	Current_sensor *PhaseA;
 	Current_sensor *PhaseB;
 
-	//Controladores /
+	//Controladores //
 	uint32_t MechTs;
 	uint32_t elecTs;
 	uint32_t MechanicalTsRatio;
@@ -79,6 +79,14 @@ typedef struct {
 	float Electrical_controller[2];
 	float HysteresysBands[2];
 	volatile uint32_t controller_counter;
+	// Valores anteriores de controlador
+	volatile float e_error_d_prev;
+	volatile float e_error_q_prev;
+	volatile float m_error_prev;
+	volatile float e_v_d_prev;
+	volatile float e_v_q_prev;
+	volatile float tel_ref_prev;
+
 
 	uint8_t ControllerFlag; // 0 = nao config | 1 = SixStep | 2 = FOC | 3 = DTC Classico
 
