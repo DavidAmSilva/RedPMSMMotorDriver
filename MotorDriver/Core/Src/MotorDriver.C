@@ -165,9 +165,13 @@ void AlignMotor (Motor *PMSM, float Valign){
 		ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, i*TWOPI/ALIGNSTEPS);
 		HAL_Delay(100);
 	}
+
+	ApplyVoltageVector(PMSM, Valign , 0, PMSM->Inverter->Bus_voltage, 0);
+	HAL_Delay(100);
 	PMSM->encoder->MechanicalAngle = 0;
 	PMSM->encoder->ElectricalAngle =0;
 	__HAL_TIM_SetCounter(PMSM->encoder->Timer,0);
+	ApplyVoltageVector(PMSM, 0 , 0, PMSM->Inverter->Bus_voltage, 0);
 }
 
 
@@ -229,15 +233,23 @@ void CalibrateCurrentOffset(Motor *PMSM){
 
 
 void ReadMotorCurrents(Motor *PMSM, float *I_a, float *I_b){
-	float rawA = (float)ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel);
-	float rawB = (float)ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel);
-	*I_a = (rawA - PMSM->PhaseA->Offset)*PMSM->PhaseA->currentGain;
-	*I_b = (rawB - PMSM->PhaseB->Offset)*PMSM->PhaseB->currentGain;
+	uint32_t rawA = ReadADC_Channel(PMSM->PhaseA->ADCHandler,PMSM->PhaseA->channel);
+	uint32_t rawB = ReadADC_Channel(PMSM->PhaseB->ADCHandler,PMSM->PhaseB->channel);
+
+	int32_t diffA = (int32_t)rawA - (int32_t)PMSM->PhaseA->Offset;
+	int32_t diffB = (int32_t)rawB - (int32_t)PMSM->PhaseB->Offset;
+
+	float v_sense_A = ((float)diffA * VDDA) / ADCSTEPS;
+	float v_sense_B = ((float)diffB * VDDA) / ADCSTEPS;
+
+	// Conversão de tensão para corrente utilizando o ganho [A/V]
+	*I_a = v_sense_A * PMSM->PhaseA->currentGain;
+	*I_b = v_sense_B * PMSM->PhaseB->currentGain;
 
 }
 
 void updateEncoder(Motor *PMSM){
-	int16_t count = __HAL_TIM_GetCounter(PMSM->encoder->Timer);
+	int16_t count =(int16_t)__HAL_TIM_GetCounter(PMSM->encoder->Timer);
 	__HAL_TIM_SetCounter(PMSM->encoder->Timer,0);
 	float rawAngle = PMSM->encoder->MechanicalAngle + count*TWOPI/PMSM->encoder->CPR;
 	if (rawAngle > TWOPI){
@@ -260,8 +272,8 @@ void updateEncoder(Motor *PMSM){
 //Mode == 0 -> Torque control // Mode == 1 -> Speed control
 void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	float ia,ib,ialfa = 0,ibeta = 0,id =0,iq=0,iqref=0;
-	static float e_errord =0, e_errorq = 0, m_error = 0, vdref=0, vqref=0; //Declarando erros mecânicos e elétricos
-	static float tel_ref=0;
+	float e_errord =0, e_errorq = 0, m_error = 0, vdref=0, vqref=0; //Declarando erros mecânicos e elétricos
+	float tel_ref=0;
 	updateEncoder(PMSM);
 	ReadMotorCurrents(PMSM, &ia, &ib);
 	arm_clarke_f32(ia, ib,&ialfa ,&ibeta);
@@ -270,10 +282,9 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	arm_park_f32(PMSM->ialfa, PMSM->ibeta, &id, &iq, arm_sin_f32(PMSM->encoder->ElectricalAngle), arm_cos_f32(PMSM->encoder->ElectricalAngle));
 	PMSM->id = id;
 	PMSM->iq = iq;
-	//PMSM->e_error_d_prev = e_errord;
-	//PMSM->e_error_q_prev = e_errorq;
+
 	if (mode ==0){
-		iqref = 0.66666f*(ref/PMSM->Kt); // (2/3)*(Tel/Kt)
+		iqref = 0.66666f*(ref/(PMSM->PP*PMSM->Phy_nom)); // (2/3)*(Tel/Kt)
 	} else if (mode == 1){
 		if (PMSM->controller_counter>= PMSM->MechanicalTsRatio){
 			PMSM->controller_counter = 0;
@@ -293,7 +304,7 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 		}
 
 
-		iqref =  0.66666f*tel_ref/PMSM->Kt;
+		iqref =  0.66666f*tel_ref/(PMSM->PP*PMSM->Phy_nom);
 
 	}
 	e_errord = -PMSM->id;
@@ -306,6 +317,10 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	//Implementar contrlador eletrico + SVPWM
 	vdref = PMSM->e_v_d_prev + PMSM->Electrical_controller[0]*e_errord - PMSM->Electrical_controller[1]*PMSM->e_error_d_prev;
 	vqref = PMSM->e_v_q_prev + PMSM->Electrical_controller[0]*e_errorq - PMSM->Electrical_controller[1]*PMSM->e_error_q_prev;
+
+	PMSM->e_error_d_prev = e_errord;
+		PMSM->e_error_q_prev = e_errorq;
+
 	if (vdref > PMSM->Vmax){
 		vdref = PMSM->Vmax;
 	} else if (vdref < -PMSM->Vmax){
@@ -320,7 +335,8 @@ void updateFOCController(Motor *PMSM, float ref, uint8_t mode){
 	}
 	PMSM->e_v_q_prev = vqref;
 
-
+	vqref =5;
+	vdref =0;
 	ApplyVoltageVector(PMSM, vdref, vqref, PMSM->Inverter->Bus_voltage, PMSM->encoder->ElectricalAngle);
 
 	PMSM->controller_counter += 1; // Passar contador para interrupção

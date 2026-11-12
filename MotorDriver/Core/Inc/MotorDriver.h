@@ -17,7 +17,8 @@
 #define TWOPI 6.2831853f
 #define SQRT3 1.73205f
 #define ALIGNSTEPS 20
-
+#define ADCSTEPS 4095.0f
+#define VDDA 3.3
 
 typedef struct {
 

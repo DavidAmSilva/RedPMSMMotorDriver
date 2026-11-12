@@ -119,29 +119,37 @@ int main(void)
   MX_ADC2_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  float Vbus = 18;
+  float Vbus = 10;
   SetInverter(&inversor, (TIM_HandleTypeDef*[]){&htim1,&htim1,&htim1} , (uint32_t[]){TIM_CHANNEL_1,TIM_CHANNEL_2,TIM_CHANNEL_3} , (GPIO_TypeDef*[]){GPIOA,GPIOA,GPIOA}, (uint16_t[]){GPIO_PIN_2,GPIO_PIN_3,GPIO_PIN_4}, 1);
   HAL_TIM_PWM_Init(&htim1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
   setEncoder(&encM1, &htim3, 4096);
  //HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);
-  SetCurrentSensor(&PhaseA, &hadc1, ADC_CHANNEL_1, 0.2);
-  SetCurrentSensor(&PhaseB, &hadc1, ADC_CHANNEL_2, 0.2);
-  SetMotorParameters(&MotorRed1, 0.000787, 0.012, 0.127, 0.1, 0.85, Vbus/SQRT3, 11, &encM1);
-  SetMotorFOC(&MotorRed1,&inversor, (float[]){0.01, 0.01},(float[]){0.01, 0.01}, &PhaseA, &PhaseB, 100, 100000);
+  SetCurrentSensor(&PhaseA, &hadc1, ADC_CHANNEL_1, 1);
+  SetCurrentSensor(&PhaseB, &hadc1, ADC_CHANNEL_2, 1);
+  SetMotorParameters(&MotorRed1, 0.000787, 0.01154, 0.127, 0.1, 0.85, Vbus/SQRT3, 11, &encM1);
+  SetMotorFOC(&MotorRed1,&inversor, (float[]){8.688, 3.119},(float[]){0.0914, 0.0894}, &PhaseA, &PhaseB, 100, 100000);
+  MotorRed1.Inverter->Bus_voltage = Vbus;
   CalibrateCurrentOffset(&MotorRed1);
+  AlignMotor(&MotorRed1, 5);
+  ApplyVoltageVector(&MotorRed1, 2,0, Vbus, 0);
+  HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  uint32_t now = 0, next_blink = 250;
+  uint32_t now = 0, next_blink = 50;
   while (1)
   {
 	  now = uwTick;
 	  if  (now >= next_blink){
 		 HAL_GPIO_TogglePin(LED_Board_GPIO_Port,LED_Board_Pin);
-		 updateEncoder(&MotorRed1);
-		 printf("position %f\r\n",MotorRed1.encoder->MechanicalAngle);
+		 //updateEncoder(&MotorRed1);
+		 //printf("ENcoder %f\r\n",MotorRed1.encoder->MechanicalAngle);
+		 //printf("Fase B %d\r\n",MotorRed1.PhaseB->Offset);
 		 next_blink = now+50;
 	  }
     /* USER CODE END WHILE */
@@ -206,6 +214,19 @@ int _write(int file, char *ptr, int len)
     }
     return len;
 }
+
+
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM1)
+    {
+        if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_4)
+        {
+            //updateFOCController(&MotorRed1, 0.05, 0);
+        }
+    }
+}
+
 /* USER CODE END 4 */
 
 /**
